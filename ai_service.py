@@ -5,7 +5,7 @@ from knowledge_base import BASE_CONHECIMENTO
 
 GEMINI_REST_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.5-flash:generateContent"
+    "gemini-3.8-flash:generateContent"
 )
 
 
