@@ -3,10 +3,12 @@ import time
 import requests
 from knowledge_base import BASE_CONHECIMENTO
 
-GEMINI_REST_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-3.8-flash:generateContent"
-)
+BASE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+MODELOS_CANDIDATOS = [
+    "gemini-3.8-flash",
+    "gemini-3.8-flash-lite",
+    "gemini-3.5-flash",
+]
 
 
 def consultar_assistente(pergunta: str, api_key: str) -> dict:
@@ -46,34 +48,61 @@ BASE DE CONHECIMENTO:
     }
 
     inicio = time.perf_counter()
-    try:
-        response = requests.post(
-            GEMINI_REST_URL,
-            params={"key": api_key.strip()},
-            headers={"Content-Type": "application/json"},
-            json=payload,
-            timeout=20,
-        )
-        latencia_ms = int((time.perf_counter() - inicio) * 1000)
+    ultimo_erro = "Nenhum modelo respondeu."
 
-        if response.status_code != 200:
-            return {
-                "erro": f"Erro HTTP {response.status_code} na API REST: {response.text[:200]}"
-            }
+    for modelo in MODELOS_CANDIDATOS:
+        url = f"{BASE_API_URL}/{modelo}:generateContent"
 
-        body = response.json()
-        texto_json = body["candidates"][0]["content"]["parts"][0]["text"]
-        resultado = json.loads(texto_json)
+        for tentativa in range(2):
+            try:
+                response = requests.post(
+                    url,
+                    params={"key": api_key.strip()},
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                    timeout=20,
+                )
 
-        return {
-            "respondido": bool(resultado.get("respondido", False)),
-            "topico": str(resultado.get("topico", "Geral")).strip(),
-            "resposta": str(resultado.get("resposta", "")).strip(),
-            "latencia_ms": latencia_ms,
-            "raw_json": resultado,
-        }
+                if response.status_code == 200:
+                    latencia_ms = int((time.perf_counter() - inicio) * 1000)
+                    body = response.json()
+                    texto_json = body["candidates"][0]["content"]["parts"][0]["text"]
+                    resultado = json.loads(texto_json)
+                    resultado["_modelo_utilizado"] = modelo
 
-    except requests.exceptions.Timeout:
-        return {"erro": "Tempo limite excedido ao chamar a API REST (Timeout)."}
-    except Exception as e:
-        return {"erro": f"Falha ao processar resposta da API: {str(e)}"}
+                    return {
+                        "respondido": bool(resultado.get("respondido", False)),
+                        "topico": str(resultado.get("topico", "Geral")).strip(),
+                        "resposta": str(resultado.get("resposta", "")).strip(),
+                        "latencia_ms": latencia_ms,
+                        "raw_json": resultado,
+                    }
+
+                # Chave inválida ou erro de requisição: não adianta tentar outros modelos
+                if response.status_code in (400, 401, 403):
+                    return {
+                        "erro": f"Erro de autenticação/requisição ({response.status_code}): verifique sua Gemini API Key."
+                    }
+
+                # 503 (alta demanda) ou 429 (rate limit): espera breve e tenta novamente antes de trocar de modelo
+                if response.status_code in (429, 503):
+                    ultimo_erro = f"Servidor temporariamente sobrecarregado (HTTP {response.status_code} no {modelo})."
+                    if tentativa == 0:
+                        time.sleep(1.5)
+                        continue
+                    break
+
+                # 404 ou outro status específico do modelo: pula direto para o próximo modelo da lista
+                ultimo_erro = f"HTTP {response.status_code} em {modelo}"
+                break
+
+            except requests.exceptions.Timeout:
+                ultimo_erro = f"Timeout ao consultar {modelo}."
+                break
+            except Exception as e:
+                ultimo_erro = f"Falha ao processar resposta ({modelo}): {str(e)}"
+                break
+
+    return {
+        "erro": f"Os modelos de IA estão com alta demanda no momento ({ultimo_erro}). Aguarde alguns segundos e clique novamente."
+    }
