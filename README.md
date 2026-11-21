@@ -1,4 +1,4 @@
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://api-health-monitor-ia.streamlit.app/)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://assistente-faq-radar-sql.streamlit.app/)
 # 💬 Assistente de FAQ com Radar de Dúvidas (Python + SQL + API REST + IA)
 
 Chatbot de atendimento ao cliente projetado para responder **exclusivamente** com base na política oficial da empresa (prevenção de alucinações via *grounding* e saída estruturada em JSON) e registrar automaticamente perguntas não respondidas em um banco **SQL** para análise de lacunas de conhecimento.
